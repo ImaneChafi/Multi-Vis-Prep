@@ -186,7 +186,7 @@ per-patient folder structure.
   the matched region. **Lower is better**; reflects accuracy where the scan
   registered.
 
-On the reported cohort the pipeline reaches a mean RMSD of ~0.26&nbsp;mm.
+On the reported cohort the pipeline reaches a mean RMSD of ~0.27&nbsp;mm.
 
 ---
 
