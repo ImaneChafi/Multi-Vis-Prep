@@ -8,7 +8,7 @@ its pulp) can be visualised relative to the scanned crowns, without an
 intra-operative scan. It ships with an interactive web viewer, a command-line
 pipeline, and evaluation and figure-generation scripts.
 
-![CBCT and IOS registration pipeline](assets/pipeline.png)
+![CBCT and IOS registration pipeline](assets/pipeline_diagram.png)
 
 *The pipeline takes three inputs (a CBCT tooth segmentation, a CBCT pulp
 segmentation and an intraoral scan), aligns them with a fully automatic
