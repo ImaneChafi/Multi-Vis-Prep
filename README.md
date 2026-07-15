@@ -213,10 +213,6 @@ assets/                 figures used in this README
 ```
 
 ## Notes
-
-- The PointNetLK-style network from the MICCAI STSR baseline never takes the CBCT
-  as input, so it cannot register against a segmentation; this repository uses the
-  surface-registration approach instead, which consumes both modalities.
 - Registration quality depends on IOS quality. Low-resolution or heavily decimated
   scans, and scans that cover only part of an arch, register less reliably; the
   strict NSD metric flags these cases.
