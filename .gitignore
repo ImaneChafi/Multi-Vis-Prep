@@ -216,3 +216,25 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# ---- Multi-Vis-Prep project ----
+# Patient scans / segmentations are not distributed
+data/
+outputs/
+# TIPs / nnU-Net trained weights and working dirs
+nnResults/
+*_resample_teeth_input/
+*_resample_teeth_binary/
+*_resample_teeth_instance/
+*_resample_pulps_input/
+*_resample_pulps_segmentation/
+*_resample_pulps_instance/
+separated/
+# macOS / editor
+.DS_Store
+.venv/
+# LaTeX build artefacts
+*.aux
+*.log
+*.out
+*.synctex.gz

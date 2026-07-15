@@ -1,0 +1,7 @@
+numpy
+open3d
+nibabel
+scipy
+scikit-image
+matplotlib
+flask

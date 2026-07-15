@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>IOS &harr; CBCT Registration</title>
+<style>
+  :root { --bg:#0f1420; --panel:#171d2b; --line:#2a3346; --txt:#e6ebf5; --mut:#8b97ad;
+          --teeth:#c9d1e0; --pulp:#ff5d6c; --ios:#4bd07f; --accent:#5b8cff; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:-apple-system,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--txt); height:100vh; overflow:hidden; }
+  .app { display:grid; grid-template-columns:340px 1fr; height:100vh; }
+  .sidebar { background:var(--panel); border-right:1px solid var(--line); padding:18px; overflow-y:auto; }
+  h1 { font-size:16px; margin:0 0 4px; }
+  .sub { color:var(--mut); font-size:12px; margin-bottom:18px; }
+  label { display:block; font-size:12px; color:var(--mut); margin:14px 0 6px; text-transform:uppercase; letter-spacing:.04em; }
+  select, button { width:100%; padding:9px 10px; background:#0e1420; color:var(--txt); border:1px solid var(--line); border-radius:8px; font-size:13px; }
+  select:focus { outline:1px solid var(--accent); }
+  input[type=file] { width:100%; font-size:12px; color:var(--mut); background:#0e1420; border:1px solid var(--line); border-radius:8px; padding:7px; }
+  input[type=file]::file-selector-button { background:var(--line); color:var(--txt); border:none; border-radius:6px; padding:6px 10px; margin-right:10px; cursor:pointer; font-size:12px; }
+  button.run { background:var(--accent); border:none; color:#fff; font-weight:600; cursor:pointer; margin-top:18px; padding:11px; }
+  button.run:disabled { opacity:.5; cursor:default; }
+  .metrics { margin-top:18px; border-top:1px solid var(--line); padding-top:14px; display:none; }
+  .metric { display:flex; justify-content:space-between; font-size:13px; margin:7px 0; }
+  .metric b { font-variant-numeric:tabular-nums; }
+  .badge { display:inline-block; padding:2px 8px; border-radius:20px; font-size:11px; font-weight:600; }
+  .good { background:rgba(75,208,127,.15); color:var(--ios); }
+  .mid  { background:rgba(255,193,74,.15); color:#ffc14a; }
+  .low  { background:rgba(255,93,108,.15); color:var(--pulp); }
+  .legend { margin-top:16px; font-size:12px; }
+  .legend .chk { display:flex; align-items:center; gap:8px; margin:6px 0; color:var(--mut); cursor:pointer; }
+  .legend .chk input { width:auto; margin:0; }
+  .dot { width:11px; height:11px; border-radius:50%; }
+  .note { font-size:11px; color:var(--mut); margin-top:16px; line-height:1.5; }
+  #viewer { position:relative; }
+  #status { position:absolute; top:14px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,.6);
+            padding:8px 16px; border-radius:20px; font-size:13px; display:none; }
+  .hint { position:absolute; bottom:12px; left:50%; transform:translateX(-50%); color:var(--mut); font-size:11px; }
+  .out { font-size:11px; color:var(--mut); margin-top:10px; word-break:break-all; }
+  .tips { border:1px solid var(--line); border-radius:10px; padding:12px; margin-top:6px; background:#0e1420; }
+  .tips h2 { font-size:12px; margin:0 0 4px; color:var(--txt); text-transform:uppercase; letter-spacing:.04em; }
+  .tips .desc { font-size:11px; color:var(--mut); margin-bottom:8px; line-height:1.5; }
+  button.seg { background:#243352; border:1px solid var(--accent); color:#dbe6ff; font-weight:600; cursor:pointer; margin-top:8px; padding:9px; }
+  button.seg:disabled { opacity:.5; cursor:default; }
+  .seg-ok { color:var(--ios); }
+  .seg-err { color:var(--pulp); }
+  .or { text-align:center; color:var(--mut); font-size:11px; margin:14px 0 2px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="sidebar">
+    <h1>IOS &harr; CBCT Registration</h1>
+    <div class="sub">Provide the two CBCT segmentations (teeth and pulp) and an intraoral scan to align them (global FPFH + ICP).</div>
+
+    <div class="tips" id="tips-block">
+      <h2>Only a raw CBCT?</h2>
+      <div class="desc">Segment it with <b>TIPs</b> to get the teeth and pulp
+        first. This runs an nnU-Net pipeline and can take a few minutes.</div>
+      <input type="file" id="cbct" accept=".nii,.nii.gz,.gz">
+      <button class="seg" id="seg">Segment with TIPs</button>
+      <div class="out" id="seg-status"></div>
+    </div>
+
+    <div class="or">— or provide the segmentations directly —</div>
+
+    <label for="teeth">CBCT tooth segmentation (NIfTI)</label>
+    <input type="file" id="teeth" accept=".nii,.nii.gz,.gz">
+
+    <label for="pulp">CBCT pulp segmentation (NIfTI)</label>
+    <input type="file" id="pulp" accept=".nii,.nii.gz,.gz">
+
+    <label for="ios">Intraoral scan (PLY / STL)</label>
+    <input type="file" id="ios" accept=".ply,.stl">
+
+    <label for="arch">Arch</label>
+    <select id="arch">
+      <option value="auto">Auto (best fit)</option>
+      <option value="upper">Upper</option>
+      <option value="lower">Lower</option>
+      <option value="both">Both (whole mouth)</option>
+    </select>
+
+    <button class="run" id="run">Register</button>
+
+    <div class="metrics" id="metrics">
+      <div class="metric"><span>Arch used</span><b id="m-arch">–</b></div>
+      <div class="metric"><span>IOS mirrored</span><b id="m-mirror">–</b></div>
+      <div class="metric"><span>Overlap @0.5 mm</span><b id="m-strict">–</b></div>
+      <div class="metric"><span>RMSD (mm)</span><b id="m-rmse">–</b></div>
+      <div class="metric"><span>Coverage @1.5 mm</span><b id="m-fit">–</b></div>
+      <div class="metric"><span>Quality</span><span id="m-q" class="badge">–</span></div>
+      <div class="out" id="m-out"></div>
+    </div>
+
+    <div class="legend">
+      <label class="chk"><input type="checkbox" id="v-teeth" checked><span class="dot" style="background:var(--teeth)"></span> CBCT teeth (fixed)</label>
+      <label class="chk"><input type="checkbox" id="v-pulp" checked><span class="dot" style="background:var(--pulp)"></span> CBCT pulp (fixed)</label>
+      <label class="chk"><input type="checkbox" id="v-ios" checked><span class="dot" style="background:var(--ios)"></span> IOS (moved onto CBCT)</label>
+    </div>
+
+    <label for="opacity">Transparency</label>
+    <input type="range" id="opacity" min="0.1" max="1" step="0.05" value="0.45" style="width:100%">
+
+    <div class="note">Surfaces are rendered semi-transparent so overlapping structures stay visible.
+      <b>Overlap @0.5&nbsp;mm</b> is the main quality metric (fraction of IOS points within 0.5&nbsp;mm
+      of a tooth surface). A flipped or wrong alignment scores low here even if coverage looks high.
+      RMSD is the root-mean-square residual over matched points. The 4&times;4 transform (IOS&rarr;CBCT) and its
+      inverse are saved under <code>outputs/&lt;scan-name&gt;/</code>.</div>
+  </div>
+
+  <div id="viewer">
+    <div id="status">Registering…</div>
+    <div class="hint">drag to rotate · scroll to zoom · right-drag to pan</div>
+  </div>
+</div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const viewer = document.getElementById('viewer');
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0f1420);
+const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 5000);
+const renderer = new THREE.WebGLRenderer({ antialias:true });
+viewer.appendChild(renderer.domElement);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+
+// Lighting so surfaces read as 3D.
+scene.add(new THREE.AmbientLight(0xffffff, 0.75));
+const key = new THREE.DirectionalLight(0xffffff, 0.7); key.position.set(1, 1, 2); scene.add(key);
+const fill = new THREE.DirectionalLight(0xffffff, 0.4); fill.position.set(-1, -1, -1); scene.add(fill);
+
+let meshGroup = new THREE.Group();
+scene.add(meshGroup);
+const meshes = {};        // name -> THREE.Mesh
+const baseOpacity = { teeth: 0.65, pulp: 1.0, ios: 1.0 };  // relative multipliers
+
+function resize() {
+  const w = viewer.clientWidth, h = viewer.clientHeight;
+  renderer.setSize(w, h); camera.aspect = w/h; camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', resize); resize();
+
+function makeMesh(data, colorHex, name) {
+  if (!data || !data.vertices || data.vertices.length === 0 || !data.faces || data.faces.length === 0) return null;
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(data.vertices, 3));
+  geo.setIndex(data.faces);
+  geo.computeVertexNormals();
+  const mat = new THREE.MeshStandardMaterial({
+    color: colorHex, transparent: true, opacity: 0.45,
+    side: THREE.DoubleSide, depthWrite: false, roughness: 0.6, metalness: 0.0
+  });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.userData.name = name;
+  meshes[name] = mesh;
+  return mesh;
+}
+
+function render() { requestAnimationFrame(render); controls.update(); renderer.render(scene, camera); }
+render();
+
+function applyOpacity(base) {
+  for (const [name, m] of Object.entries(meshes)) {
+    m.material.opacity = Math.min(1, base * (baseOpacity[name] ?? 1));
+    // The mostly-opaque pulp writes depth so it stays crisp inside the teeth.
+    m.material.depthWrite = m.material.opacity > 0.9;
+  }
+}
+
+function showMeshes(data) {
+  scene.remove(meshGroup);
+  meshGroup = new THREE.Group();
+  for (const k of Object.keys(meshes)) delete meshes[k];
+  const teeth = makeMesh(data.teeth, 0xc9d1e0, 'teeth');
+  const pulp  = makeMesh(data.pulp,  0xff5d6c, 'pulp');
+  const ios   = makeMesh(data.ios,   0x4bd07f, 'ios');
+  [teeth, pulp, ios].forEach(m => m && meshGroup.add(m));
+  scene.add(meshGroup);
+  applyOpacity(parseFloat(document.getElementById('opacity').value));
+  syncVisibility();
+
+  const box = new THREE.Box3().setFromObject(meshGroup);
+  const center = box.getCenter(new THREE.Vector3());
+  const sphere = box.getBoundingSphere(new THREE.Sphere());
+  controls.target.copy(center);
+  const d = sphere.radius * 2.6;
+  camera.position.set(center.x + d, center.y - d*0.3, center.z + d*0.7);
+  camera.near = sphere.radius/100; camera.far = sphere.radius*100; camera.updateProjectionMatrix();
+}
+
+function syncVisibility() {
+  ['teeth','pulp','ios'].forEach(n => {
+    if (meshes[n]) meshes[n].visible = document.getElementById('v-'+n).checked;
+  });
+}
+['teeth','pulp','ios'].forEach(n =>
+  document.getElementById('v-'+n).addEventListener('change', syncVisibility));
+document.getElementById('opacity').addEventListener('input', e =>
+  applyOpacity(parseFloat(e.target.value)));
+
+// ---- UI wiring ----
+const teethInp = document.getElementById('teeth');
+const pulpInp = document.getElementById('pulp');
+const iosInp = document.getElementById('ios');
+const archSel = document.getElementById('arch');
+const runBtn = document.getElementById('run');
+const statusEl = document.getElementById('status');
+const cbctInp = document.getElementById('cbct');
+const segBtn = document.getElementById('seg');
+const segStatus = document.getElementById('seg-status');
+
+// TIPs segmentation: check availability, then wire the button.
+let tipsJob = null;   // set once a CBCT has been segmented server-side
+fetch('/api/tips_status').then(r => r.json()).then(s => {
+  if (!s.available) {
+    segBtn.disabled = true;
+    segStatus.className = 'out';
+    segStatus.textContent = s.reason;
+  }
+}).catch(() => {});
+
+segBtn.addEventListener('click', async () => {
+  if (!cbctInp.files[0]) {
+    segStatus.className = 'out seg-err';
+    segStatus.textContent = 'Choose a raw CBCT volume (.nii / .nii.gz) first.';
+    return;
+  }
+  segBtn.disabled = true;
+  segStatus.className = 'out';
+  segStatus.textContent = 'Running TIPs segmentation… (this can take a few minutes)';
+  try {
+    const fd = new FormData();
+    fd.append('cbct', cbctInp.files[0]);
+    const r = await fetch('/api/segment', { method:'POST', body: fd });
+    const data = await r.json();
+    if (data.error) {
+      segStatus.className = 'out seg-err';
+      segStatus.textContent = 'Error: ' + data.error;
+    } else {
+      tipsJob = data.job;
+      segStatus.className = 'out seg-ok';
+      segStatus.textContent = 'Teeth + pulp segmented by TIPs. You can Register now (IOS only needed).';
+    }
+  } catch (e) {
+    segStatus.className = 'out seg-err';
+    segStatus.textContent = 'Error: ' + e;
+  }
+  segBtn.disabled = false;
+});
+
+// A fresh manual upload of the segmentations overrides the TIPs job.
+teethInp.addEventListener('change', () => { if (teethInp.files[0]) tipsJob = null; });
+pulpInp.addEventListener('change', () => { if (pulpInp.files[0]) tipsJob = null; });
+
+// If the IOS filename names the arch (…_l_… / …_u_…), preselect it.
+iosInp.addEventListener('change', () => {
+  const name = (iosInp.files[0] ? iosInp.files[0].name : '').toLowerCase();
+  if (/_l[._]/.test(name)) archSel.value = 'lower';
+  else if (/_u[._]/.test(name)) archSel.value = 'upper';
+});
+
+function qBadge(strict) {
+  const el = document.getElementById('m-q');
+  el.className = 'badge ' + (strict >= 0.5 ? 'good' : strict >= 0.35 ? 'mid' : 'low');
+  el.textContent = strict >= 0.5 ? 'Good' : strict >= 0.35 ? 'Fair' : 'Poor';
+}
+
+runBtn.addEventListener('click', async () => {
+  const haveSegs = (teethInp.files[0] && pulpInp.files[0]) || tipsJob;
+  if (!iosInp.files[0] || !haveSegs) {
+    statusEl.style.display = 'block';
+    statusEl.textContent = 'Need an IOS file plus the teeth+pulp segmentations (upload both, or segment a CBCT with TIPs).';
+    return;
+  }
+  runBtn.disabled = true; statusEl.style.display = 'block'; statusEl.textContent = 'Registering…';
+  try {
+    const fd = new FormData();
+    fd.append('ios', iosInp.files[0]);
+    fd.append('arch', archSel.value);
+    if (tipsJob && !(teethInp.files[0] && pulpInp.files[0])) {
+      fd.append('job', tipsJob);           // reuse the TIPs segmentations
+    } else {
+      fd.append('teeth', teethInp.files[0]);
+      fd.append('pulp', pulpInp.files[0]);
+    }
+    const r = await fetch('/api/register', { method:'POST', body: fd });
+    const data = await r.json();
+    if (data.error) { statusEl.textContent = 'Error: ' + data.error; runBtn.disabled = false; return; }
+    document.getElementById('metrics').style.display = 'block';
+    document.getElementById('m-arch').textContent = data.arch;
+    document.getElementById('m-mirror').textContent = data.mirrored ? 'Yes (handedness fixed)' : 'No';
+    document.getElementById('m-strict').textContent = data.strict_overlap;
+    document.getElementById('m-rmse').textContent = data.rmse_mm;
+    document.getElementById('m-fit').textContent = data.fitness;
+    document.getElementById('m-out').textContent = 'saved → ' + data.output_dir;
+    qBadge(data.strict_overlap);
+    showMeshes(data.meshes);
+    statusEl.style.display = 'none';
+  } catch (e) { statusEl.textContent = 'Error: ' + e; }
+  runBtn.disabled = false;
+});
+</script>
+</body>
+</html>
