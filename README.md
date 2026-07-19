@@ -171,8 +171,7 @@ mesh (`ios_registered.ply`, in CBCT space), and `summary.json` with the metrics.
 
 For reproducing a whole cohort, `eval_metrics.py`, `eval_all.py` and
 `generate_figures.py` iterate a data folder. They read the roots from the
-`SEG_ROOT` / `IOS_ROOT` environment variables (unset by default, so no folder is
-touched unless you opt in). See the top of `registration.py` for the expected
+`SEG_ROOT` / `IOS_ROOT` environment variables. See the top of `registration.py` for the expected
 per-patient folder structure.
 
 ---
