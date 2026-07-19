@@ -16,8 +16,7 @@ surface-based registration, and returns a 4×4 transform and a fused view.*
 
 ![Registered intraoral scans on the CBCT teeth and pulp segmentation](assets/registration_montage.png)
 
-*Green: registered intraoral scan. Grey: CBCT teeth. Red: pulp. Surfaces are drawn
-semi-transparent so the pulp remains visible inside the crowns.*
+*Green: registered intraoral scan. Grey: CBCT teeth. Red: pulp.*
 
 ---
 
