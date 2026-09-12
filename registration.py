@@ -77,9 +77,12 @@ def _patient_number(name):
     return m.group(1) if m else None
 
 
-def discover_patients():
+def discover_patients(ios_mode="clean"):
     """Return {patient_number: {seg_dir, ios_dir, teeth, pulp, ios_candidates}}
-    for every patient that has BOTH a teeth segmentation and at least one IOS."""
+    for every patient that has BOTH a teeth segmentation and at least one IOS.
+
+    ios_mode is passed to _find_ios_candidates: "clean" (gingiva-removed .ply
+    only, the app default) or "all" (every scan incl. shells/STL, one per arch)."""
     patients = {}
 
     # Index segmentation folders by patient number
@@ -117,7 +120,7 @@ def discover_patients():
         if teeth is None:
             continue
 
-        ios_candidates = _find_ios_candidates(ios_dir)
+        ios_candidates = _find_ios_candidates(ios_dir, mode=ios_mode)
         if not ios_candidates:
             continue
 
@@ -143,11 +146,20 @@ def _find_seg_file(seg_dir, subdir):
     return files[0] if files else None
 
 
-def _find_ios_candidates(ios_dir):
-    """Only the cleaned, gingiva-removed IOS ('*without_gingiva*.ply') so the
-    tooth crowns overlay the CBCT segmentation without gingiva occluding it.
-    Raw OrthoCAD shells (which include gingiva) and '.vtp.ply' duplicates are
-    excluded, as are files inside prior-registration / backup subfolders."""
+def _find_ios_candidates(ios_dir, mode="clean"):
+    """Find intraoral-scan files for a patient.
+
+    mode="clean" (default): only the cleaned, gingiva-removed IOS
+      ('*without_gingiva*.ply'), so the tooth crowns overlay the CBCT
+      segmentation without gingiva occluding it. This is what the web app uses.
+
+    mode="all": every usable scan (.ply and .stl), including raw OrthoCAD shells
+      that still contain gingiva, keeping ONE file per arch (preferring a
+      gingiva-removed .ply when several exist). Use this to evaluate the whole
+      cohort, not just the cases that happen to have a cleaned scan.
+
+    In both modes, '.vtp.ply' duplicates and files inside prior-registration /
+    backup / test subfolders are excluded."""
     skip = ("registration", "test_for_metrics", "backup")
 
     def ok(p):
@@ -158,9 +170,26 @@ def _find_ios_candidates(ios_dir):
             return False
         return True
 
-    cleaned = [p for p in glob.glob(os.path.join(ios_dir, "**", "*.ply"), recursive=True)
-               if "without_gingiva" in os.path.basename(p).lower() and ok(p)]
-    return sorted(set(cleaned))
+    exts = ("*.ply",) if mode == "clean" else ("*.ply", "*.stl")
+    files = []
+    for e in exts:
+        files += glob.glob(os.path.join(ios_dir, "**", e), recursive=True)
+    files = sorted(set(p for p in files if ok(p)))
+
+    if mode == "clean":
+        return [p for p in files if "without_gingiva" in os.path.basename(p).lower()]
+
+    # mode == "all": keep one scan per arch, preferring gingiva-removed .ply.
+    def score(p):
+        b = os.path.basename(p).lower()
+        return (3 if "without_gingiva" in b else 0) + (1 if b.endswith(".ply") else 0)
+
+    by_arch = {}
+    for p in files:
+        key = arch_from_filename(p) or os.path.basename(p)   # keep unknown-arch files distinct
+        if key not in by_arch or score(p) > score(by_arch[key]):
+            by_arch[key] = p
+    return sorted(set(by_arch.values()))
 
 
 # ----------------------------------------------------------------------------

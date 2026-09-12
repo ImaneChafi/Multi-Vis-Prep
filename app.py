@@ -23,7 +23,9 @@ import tips_segment
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 2 * 1024 * 1024 * 1024   # 2 GB (raw CBCT can be large)
-OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "outputs")
+# Output dir is configurable so a container can point it at a writable path
+# (e.g. OUTPUT_DIR=/tmp/outputs on a read-only image).
+OUTPUT_DIR = os.environ.get("OUTPUT_DIR", os.path.join(os.path.dirname(__file__), "outputs"))
 JOBS_DIR = os.path.join(OUTPUT_DIR, "tips_jobs")   # cached TIPs segmentations
 os.makedirs(JOBS_DIR, exist_ok=True)
 
@@ -155,5 +157,9 @@ def api_register():
 
 
 if __name__ == "__main__":
-    print("Open http://127.0.0.1:5001 in your browser.")
-    app.run(host="127.0.0.1", port=5001, debug=False)
+    # Bind 0.0.0.0 and honour PORT so the same entrypoint works locally and in a
+    # container (Hugging Face Spaces expects the app on port 7860).
+    host = os.environ.get("HOST", "0.0.0.0")
+    port = int(os.environ.get("PORT", 7860))
+    print(f"Serving on http://{host}:{port}")
+    app.run(host=host, port=port, threaded=True, debug=False)
